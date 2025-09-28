@@ -8,14 +8,14 @@
 
 ## 📋 Preparación Inicial
 
-### 1. Librería Requeridas (ya tienes instaladas)
+### 1. Librería Requeridas 
 - WiFiManager
 - ArduinoJson 
 - Adafruit MPU6050
 - LiquidCrystal I2C (warning normal, funciona bien)
 - OneWire, DallasTemperature
 
-### 2. Hardware Conectado (mantienes mismos pines)
+### 2. Hardware Conectado 
 - LCD I2C (0x27), MPU6050, DS18B20
 - Sensores: Vibración=GPIO34, Lluvia=GPIO36, Suelo=GPIO39
 - LEDs: Verde=13, Amarillo=12, Naranja=14, Rojo=27
