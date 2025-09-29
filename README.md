@@ -4,13 +4,13 @@
 
 ---
 ## 1. Contexto y Motivación
-En mayo de 2025 se presentaron deslizamientos en Tabio y Cajicá (Cundinamarca) que ocasionaron cierre de vías y afectaron a más de 2.200 familias. Este reto busca un sistema de bajo costo, desplegable localmente y que permita a autoridades monitorear indicadores clave de riesgo de inestabilidad: inclinación, vibración, lluvia, humedad del suelo y temperatura.
+En mayo de 2025 se presentaron deslizamientos en Tabio y Cajicá (Cundinamarca) que ocasionaron cierre de vías y afectaron a más de 2.200 familias. Este reto busca un sistema de bajo costo, desplegable localmente y que permita a autoridades monitorear indicadores clave de riesgo de inestabilidad: inclinación, vibración, lluvia, humedad del suelo y temperatura [1].
 
-El enfoque se centra en: (1) medición multi-sensorial continua, (2) procesamiento y fusión local de datos, (3) visualización restringida a la WLAN oficial y (4) alarmas diferenciadas por nivel.
+El enfoque se centra en: (1) medición multi-sensorial continua [2], (2) procesamiento y fusión local de datos [3], (3) visualización restringida a la WLAN oficial y (4) alarmas diferenciadas por nivel [4].
 
 ---
 ## 2. Objetivo General
-Desarrollar un prototipo funcional que detecte condiciones precursoras de deslizamientos mediante la combinación de al menos cinco señales independientes y provea alertas tanto locales (LEDs, buzzer, LCD) como remotas a través de un tablero de control web embebido accesible únicamente dentro de la red Wi-Fi designada.
+Desarrollar un prototipo funcional que detecte condiciones precursoras de deslizamientos mediante la combinación de al menos cinco señales independientes [5] y provea alertas tanto locales (LEDs, buzzer, LCD) como remotas a través de un tablero de control web embebido accesible únicamente dentro de la red Wi-Fi designada.
 
 ---
 ## 3. Alcance (Challenge 2)
@@ -754,7 +754,7 @@ void sensorTask(void *parameter) {
 - **Thread safety**: Mutex protege datos compartidos entre tareas concurrentes
 
 **Calibración y Parámetros:**
-- **Umbrales físicos**: Basados en literatura geotécnica y pruebas de campo
+- **Umbrales físicos**: Basados en literatura geotécnica y pruebas de campo [1], [5]
 - **Pesos de fusión**: Inclinación (35%) y Vibración (25%) como indicadores primarios
 - **Multiplicadores de sinergia**: Factor 1.5x para combinaciones críticas
 - **Ventanas temporales**: 30min para lluvia, 5s para vibración continua
@@ -863,14 +863,17 @@ Baudios: 115200.
 - computacion en la nube para solucion mas real, ademas implementar protocolos como mqtt para el manejo de la información. 
 
 ---
-## 14. Referencias (Selección)
-- Bhardwaj (2021) – Análisis de vibraciones y sistemas de alerta temprana.
-- El Moulat et al. (2018) – Arquitecturas IoT para monitoreo ambiental.
-- Henao-Céspedes et al. (2023) – Indicadores multivariables de estabilidad de laderas.
-- Piciullo et al. (2022) – Sistemas locales de alerta temprana para deslizamientos.
-- Soegoto et al. (2021) – Factores meteorológicos y riesgo geotécnico.
+## 14. Referencias
 
-(Referencias completas a desarrollar en la Wiki según formato institucional.)
+[1] M. El Moulat, O. Debauche, S. Mahmoudi, L. Aït Brahim, P. Manneback, and F. Lebeau, "Monitoring System Using Internet of Things For Potential Landslides," *Procedia Computer Science*, vol. 134, pp. 26-34, 2018, doi: 10.1016/j.procs.2018.07.140.
+
+[2] E. S. Soegoto, F. A. Fauzi, and S. Luckyardi, "Internet of things for flood and landslide early warning," *Journal of Physics: Conference Series*, vol. 1764, art. no. 012190, 2021, doi: 10.1088/1742-6596/1764/1/012190.
+
+[3] R. B. Bhardwaj, "Landslide Detection System Based on IOT," *ResearchGate Preprint*, 2021. [Online]. Available: https://www.researchgate.net/publication/350069472_Landslide_Detection_System_Based_on_IOT
+
+[4] L. Piciullo, V. Capobianco, and H. Heyerdahl, "A first step towards a IoT-based local early warning system for an unsaturated slope in Norway," *Natural Hazards*, 2022, doi: 10.1007/s11069-022-05524-3.
+
+[5] V. Henao-Céspedes, Y. A. Garcés-Gómez, and M. N. Marín Olaya, "Landslide early warning systems: a perspective from the internet of things," *Indonesian Journal of Electrical Engineering and Computer Science*, 2023. [Online]. Available: https://d1wqtxts1xzle7.cloudfront.net/97071057/99_28430_EMr_15sep22_16Mei22_20_K-libre.pdf
 
 ---
 ## 15. Cómo Probar Rápido
