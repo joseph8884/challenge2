@@ -30,345 +30,248 @@ Incluye:
 #### 4.1.1 Diagrama de Arquitectura del Sistema
 
 ```mermaid
-C4Component
-    title Sistema de Alerta Temprana de Deslizamientos - Vista de Componentes
-
-    Container_Boundary(esp32, "ESP32 Dual-Core") {
-        Component(sensorLayer, "Sensor Layer", "Hardware Abstraction", "Interfaz unificada para acceso a sensores heterogéneos")
-        Component(acqManager, "Acquisition Manager", "FreeRTOS Task", "Orquestación de lectura concurrente multi-sensor")
-        Component(dataProcessor, "Signal Processor", "Core Processing", "Normalización, filtrado y cálculo de métricas derivadas")
-        Component(fusionEngine, "Fusion Engine", "Decision Logic", "Algoritmo de scoring ponderado con detección de sinergias")
-        Component(alarmController, "Alarm Controller", "State Machine", "Gestión de estados de alarma y persistencia")
-        Component(webServer, "Web Server", "HTTP/JSON API", "Servidor embebido con endpoints REST")
-        Component(displayManager, "Display Manager", "UI Controller", "Control de interfaces visuales locales")
-        Component(dataBuffer, "Data Buffer", "Circular Buffer", "Almacenamiento temporal thread-safe")
-    }
-
-    Container_Boundary(sensors, "Sensor Subsystems") {
-        Component(mpu6050, "MPU6050", "I2C Sensor", "Acelerómetro/Giroscopio 3-axis")
-        Component(ds18b20, "DS18B20", "OneWire Sensor", "Sensor de temperatura digital")
-        Component(vibSensor, "Vibration Sensor", "GPIO/ISR", "Detector de vibración con anti-rebote")
-        Component(rainSensor, "Rain Sensor", "ADC/Digital", "Módulo de lluvia analógico + digital")
-        Component(soilSensor, "YL-100", "ADC", "Sensor de humedad del suelo")
-    }
-
-    Container_Boundary(actuators, "Actuator Subsystems") {
-        Component(ledArray, "LED Array", "GPIO Output", "Indicadores visuales por nivel de riesgo")
-        Component(buzzer, "Buzzer", "PWM Output", "Alarmas sonoras diferenciadas")
-        Component(lcd, "LCD 16x2", "I2C Display", "Pantalla de información local")
-        Component(motorDriver, "Motor Driver", "H-Bridge", "Simulador de eventos sísmicos")
-    }
-
-    Container_Boundary(network, "Network Layer") {
-        Component(wifiManager, "WiFi Manager", "Connection Manager", "Gestión automática de conectividad")
-        Component(accessControl, "Access Control", "Security Layer", "Validación de subred local")
-    }
-
-    Container_Boundary(external, "External Interfaces") {
-        Component(dashboard, "Web Dashboard", "HTML5/JS", "Interfaz de usuario web responsiva")
-        Component(serialInterface, "Serial Interface", "UART", "Comandos de diagnóstico y control")
-    }
-
-    %% Sensor Layer Relationships
-    Rel(mpu6050, sensorLayer, "I2C", "0x68")
-    Rel(ds18b20, sensorLayer, "OneWire", "Pin 5")
-    Rel(vibSensor, sensorLayer, "GPIO/ISR", "Pin 34")
-    Rel(rainSensor, sensorLayer, "ADC", "Pin 36/4")
-    Rel(soilSensor, sensorLayer, "ADC", "Pin 39")
-
+graph TB
+    subgraph "ESP32 Dual-Core MCU"
+        subgraph "Sensor Layer"
+            MPU[MPU6050<br/>I2C 0x68<br/>Acelerómetro/Giroscopio]
+            DS[DS18B20<br/>OneWire Pin 5<br/>Temperatura]
+            VIB[Vibration Sensor<br/>GPIO 34<br/>ISR Counter]
+            RAIN[Rain Sensor<br/>ADC Pin 36<br/>Digital Pin 4]
+            SOIL[YL-100<br/>ADC Pin 39<br/>Humedad Suelo]
+        end
+        
+        subgraph "Processing Core - Core 0"
+            ACQ[Acquisition Manager<br/>FreeRTOS Task<br/>1Hz Polling]
+            PROC[Signal Processor<br/>Normalization<br/>Filtering]
+            FUSION[Fusion Engine<br/>Weighted Scoring<br/>Synergy Detection]
+            ALARM[Alarm Controller<br/>State Machine<br/>Persistence Logic]
+        end
+        
+        subgraph "Interface Core - Core 1"
+            WEB[Web Server<br/>HTTP/JSON API<br/>Access Control]
+            DISP[Display Manager<br/>LCD Controller<br/>Alert Renderer]
+            WIFI[WiFi Manager<br/>Connection Control<br/>Portal Config]
+        end
+        
+        subgraph "Actuators"
+            LEDS[LED Array<br/>Pins 13,12,14,27<br/>Status Indicators]
+            BUZZ[Buzzer<br/>Pin 25<br/>Audio Alerts]
+            LCD[LCD 16x2<br/>I2C 0x27<br/>Local Display]
+            MOTOR[Motor Driver<br/>H-Bridge<br/>Test Simulation]
+        end
+        
+        subgraph "Data Storage"
+            BUFFER[Circular Buffer<br/>50 Samples<br/>Thread-Safe]
+            MUTEX[Mutex Protection<br/>Data Synchronization<br/>Concurrent Access]
+        end
+    end
+    
+    subgraph "External Interfaces"
+        DASH[Web Dashboard<br/>HTML5/CSS3/JS<br/>Responsive UI]
+        SERIAL[Serial Console<br/>115200 baud<br/>Debug Interface]
+        CLIENTS[Client Devices<br/>Local Network Only<br/>IP Validation]
+    end
+    
+    %% Sensor Connections
+    MPU --> ACQ
+    DS --> ACQ
+    VIB --> ACQ
+    RAIN --> ACQ
+    SOIL --> ACQ
+    
     %% Processing Chain
-    Rel(sensorLayer, acqManager, "read()", "1Hz polling")
-    Rel(acqManager, dataProcessor, "rawData[]", "Async")
-    Rel(dataProcessor, fusionEngine, "metrics{}", "Normalized")
-    Rel(fusionEngine, alarmController, "riskLevel", "0-3 scale")
-
+    ACQ --> PROC
+    PROC --> FUSION
+    FUSION --> ALARM
+    
     %% Data Flow
-    Rel(dataProcessor, dataBuffer, "store()", "Thread-safe")
-    Rel(dataBuffer, webServer, "getData()", "JSON format")
-    Rel(alarmController, ledArray, "setLevel()", "PWM/GPIO")
-    Rel(alarmController, buzzer, "playPattern()", "Frequency/Duration")
-    Rel(acqManager, displayManager, "currentState", "Mutex protected")
-    Rel(displayManager, lcd, "display()", "I2C commands")
-
-    %% Network Communications
-    Rel(webServer, wifiManager, "isConnected()", "Status check")
-    Rel(webServer, accessControl, "validateIP()", "Security")
-    Rel(dashboard, webServer, "HTTP/REST", "GET/POST")
-    Rel(serialInterface, alarmController, "commands", "Debug/Control")
-
-    %% Actuator Control
-    Rel(alarmController, motorDriver, "simulate()", "Test events")
-
-    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
+    PROC --> BUFFER
+    BUFFER --> WEB
+    ALARM --> LEDS
+    ALARM --> BUZZ
+    ACQ --> DISP
+    DISP --> LCD
+    
+    %% Network Layer
+    WEB --> WIFI
+    WEB --> CLIENTS
+    CLIENTS --> DASH
+    SERIAL --> ALARM
+    
+    %% Synchronization
+    BUFFER -.-> MUTEX
+    ACQ -.-> MUTEX
+    WEB -.-> MUTEX
+    DISP -.-> MUTEX
+    
+    %% Test Interface
+    ALARM --> MOTOR
 ```
 
 #### 4.1.2 Diagrama de Componentes Detallado
 
 ```mermaid
-classDiagram
-    %% Sensor Interface Layer
-    class SensorInterface {
-        <<interface>>
-        +readValue() float
-        +isConnected() bool
-        +getLastError() String
-        +calibrate() void
-    }
-
-    class MPU6050Sensor {
-        -address: 0x68
-        -accelScale: ±2g
-        -gyroScale: ±250°/s
-        +readAcceleration() Vector3D
-        +readGyroscope() Vector3D
-        +calculateInclination() float
-        +selfTest() bool
-    }
-
-    class DS18B20Sensor {
-        -pin: GPIO5
-        -resolution: 12-bit
-        -conversionTime: 750ms
-        +requestTemperature() void
-        +readTemperatureC() float
-        +getDeviceAddress() uint64_t
-    }
-
-    class VibrationSensor {
-        -pin: GPIO34
-        -isrCounter: volatile uint32_t
-        -lastTrigger: unsigned long
-        -debounceTime: 50ms
-        +attachInterrupt() void
-        +getEventsPerMinute() uint16_t
-        +isContinuous() bool
-        +resetCounter() void
-    }
-
-    %% Data Processing Layer
-    class DataProcessor {
-        -filterWindow: 5
-        -temperatureHistory: float[10]
-        -vibrationBuffer: uint16_t[60]
-        +normalizeInclination(raw: float) float
-        +calculateTempGradient() float
-        +detectVibrPattern() bool
-        +estimateSoilMoisture(adc: int) float
-        +classifyRainIntensity(adc: int) RainLevel
-    }
-
-    class FusionEngine {
-        -weights: {inc: 0.35, vib: 0.25, soil: 0.20, rain: 0.15, temp: 0.05}
-        -synergyMatrix: float[5][5]
-        -persistenceThresholds: {rain: 30min, vib: 5s}
-        +calculateScore(metrics: SensorMetrics) float
-        +detectSynergies(scores: ScoreVector) float
-        +mapToRiskLevel(totalScore: float) uint8_t
-        +applyPersistence(currentScore: float, history: TimeWindow) float
-    }
-
-    %% State Management
-    class AlarmStateMachine {
-        <<enumeration>> AlarmState
-        NORMAL
-        PRECAUCION
-        ALERTA
-        EMERGENCIA
-        ACKNOWLEDGED
-        MANUAL_EMERGENCY
+graph TD
+    subgraph "Sensor Interface Layer"
+        SI["SensorInterface<br/><<interface>><br/>+readValue() : float<br/>+isConnected() : bool<br/>+getLastError() : String<br/>+calibrate() : void"]
         
-        -currentState: AlarmState
-        -acknowledgedTime: unsigned long
-        -alarmStartTime: unsigned long
-        -emergencyTimeout: 60s
+        MPU_C["MPU6050Sensor<br/>-address : 0x68<br/>-accelScale : ±2g<br/>-gyroScale : ±250°/s<br/>+readAcceleration() : Vector3D<br/>+calculateInclination() : float<br/>+selfTest() : bool"]
         
-        +transition(newLevel: uint8_t) void
-        +acknowledge() bool
-        +reset() void
-        +triggerManualEmergency() void
-        +isAlarmActive() bool
-    }
-
-    %% Communication Layer
-    class WebServerController {
-        -server: AsyncWebServer
-        -accessControl: NetworkSecurity
-        -jsonBufferSize: 2048
-        +handleRoot() void
-        +handleDataAPI() void
-        +handleHistoryAPI() void
-        +handleAcknowledge() void
-        +handleReset() void
-        +handleEmergency() void
-        +validateClientIP(clientIP: IPAddress) bool
-    }
-
-    class DataBuffer {
-        -buffer: SensorData[50]
-        -writeIndex: uint8_t
-        -isFull: bool
-        -mutex: SemaphoreHandle_t
-        +store(data: SensorData) void
-        +getLatest() SensorData
-        +getHistory(count: uint8_t) SensorData[]
-        +clear() void
-    }
-
-    %% Hardware Abstraction
-    class ActuatorController {
-        -ledPins: {green: 13, yellow: 12, orange: 14, red: 27}
-        -buzzerPin: 25
-        -buzzerFrequencies: {normal: 0, precaution: 1000, alert: 1500, emergency: 2000}
-        +setLEDState(level: uint8_t) void
-        +playBuzzerPattern(level: uint8_t) void
-        +stopAlarm() void
-    }
-
-    class DisplayController {
-        -lcd: LiquidCrystal_I2C
-        -currentMode: DisplayMode
-        -alertBlinkState: bool
-        -lastUpdate: unsigned long
-        +drawMetrics(data: SensorData) void
-        +drawAlert(level: uint8_t) void
-        +drawWiFiInfo(status: WiFiStatus) void
-        +blinkAlert() void
-    }
-
-    %% Relationships
-    SensorInterface <|.. MPU6050Sensor
-    SensorInterface <|.. DS18B20Sensor
-    SensorInterface <|.. VibrationSensor
-
-    DataProcessor --> SensorInterface : uses
-    FusionEngine --> DataProcessor : processes
-    AlarmStateMachine --> FusionEngine : receives risk level
-    ActuatorController --> AlarmStateMachine : observes state
-    DisplayController --> AlarmStateMachine : observes state
-    WebServerController --> DataBuffer : queries data
-    DataBuffer --> DataProcessor : stores processed data
-
-    %% Composition relationships
-    WebServerController *-- NetworkSecurity
-    AlarmStateMachine *-- AlarmState
-    DataProcessor *-- FilteringAlgorithms
-    FusionEngine *-- SynergyDetector
+        DS_C["DS18B20Sensor<br/>-pin : GPIO5<br/>-resolution : 12-bit<br/>-conversionTime : 750ms<br/>+requestTemperature() : void<br/>+readTemperatureC() : float"]
+        
+        VIB_C["VibrationSensor<br/>-pin : GPIO34<br/>-isrCounter : volatile uint32_t<br/>-debounceTime : 50ms<br/>+getEventsPerMinute() : uint16_t<br/>+isContinuous() : bool<br/>+resetCounter() : void"]
+    end
+    
+    subgraph "Data Processing Layer"
+        DP["DataProcessor<br/>-filterWindow : 5<br/>-temperatureHistory : array[10]<br/>-vibrationBuffer : array[60]<br/>+normalizeInclination() : float<br/>+calculateTempGradient() : float<br/>+estimateSoilMoisture() : float"]
+        
+        FE["FusionEngine<br/>-weights : inc 0.35, vib 0.25<br/>-synergyMatrix : array[5x5]<br/>-persistenceThresholds<br/>+calculateScore() : float<br/>+detectSynergies() : float<br/>+mapToRiskLevel() : uint8_t"]
+    end
+    
+    subgraph "State Management"
+        ASM["AlarmStateMachine<br/>States: NORMAL, PRECAUCION<br/>ALERTA, EMERGENCIA<br/>ACKNOWLEDGED, MANUAL_EMERGENCY<br/>-currentState : AlarmState<br/>-emergencyTimeout : 60s<br/>+transition() : void<br/>+acknowledge() : bool<br/>+triggerManualEmergency() : void"]
+    end
+    
+    subgraph "Communication Layer"
+        WSC["WebServerController<br/>-server : AsyncWebServer<br/>-jsonBufferSize : 2048<br/>+handleRoot() : void<br/>+handleDataAPI() : void<br/>+handleEmergency() : void<br/>+validateClientIP() : bool"]
+        
+        DB["DataBuffer<br/>-buffer : SensorData[50]<br/>-writeIndex : uint8_t<br/>-mutex : SemaphoreHandle_t<br/>+store() : void<br/>+getLatest() : SensorData<br/>+getHistory() : array"]
+    end
+    
+    subgraph "Hardware Abstraction"
+        AC["ActuatorController<br/>-ledPins : green 13, yellow 12<br/>-buzzerPin : 25<br/>+setLEDState() : void<br/>+playBuzzerPattern() : void<br/>+stopAlarm() : void"]
+        
+        DC["DisplayController<br/>-lcd : LiquidCrystal_I2C<br/>-currentMode : DisplayMode<br/>-alertBlinkState : bool<br/>+drawMetrics() : void<br/>+drawAlert() : void<br/>+blinkAlert() : void"]
+    end
+    
+    %% Implementation relationships
+    SI -.->|implements| MPU_C
+    SI -.->|implements| DS_C
+    SI -.->|implements| VIB_C
+    
+    %% Usage relationships
+    DP -->|uses| SI
+    FE -->|processes| DP
+    ASM -->|receives level| FE
+    AC -->|observes| ASM
+    DC -->|observes| ASM
+    WSC -->|queries| DB
+    DB -->|stores| DP
+    
+    %% Additional components
+    WSC -.->|contains| NS["NetworkSecurity<br/>IP Validation"]
+    FE -.->|contains| SD["SynergyDetector<br/>Pattern Recognition"]
+    DP -.->|contains| FA["FilteringAlgorithms<br/>Signal Processing"]
 ```
+
+**Características Técnicas del Sistema de Componentes:**
+
+**Capa de Interfaz de Sensores:**
+- **SensorInterface**: Abstracción común para todos los sensores con manejo de errores
+- **MPU6050Sensor**: Gestión completa del acelerómetro/giroscopio con auto-calibración
+- **DS18B20Sensor**: Control de temperatura con resolución configurable y timing optimizado
+- **VibrationSensor**: Contador ISR con anti-rebote hardware y detección de patrones
+
+**Capa de Procesamiento de Datos:**
+- **DataProcessor**: Pipeline de normalización con ventanas deslizantes y filtros adaptativos
+- **FusionEngine**: Motor de decisión con matriz de sinergias y lógica de persistencia temporal
+
+**Gestión de Estados:**
+- **AlarmStateMachine**: Máquina de estados robusta con 6 estados y transiciones controladas
+- **Timeout management**: Control automático de emergencia manual (60s) y acknowledgment
+
+**Capa de Comunicación:**
+- **WebServerController**: Servidor HTTP asíncrono con 6 endpoints REST y validación de IP
+- **DataBuffer**: Buffer circular thread-safe con mutex y gestión automática de overflow
+
+**Abstracción de Hardware:**
+- **ActuatorController**: Control centralizado de LEDs multicolor y patrones de buzzer diferenciados
+- **DisplayController**: Gestor de LCD con modos de visualización y animaciones fluidas
 
 #### 4.1.3 Vista de Despliegue y Distribución de Tareas
 
 ```mermaid
-deploymentDiagram
+graph TB
+    subgraph "ESP32 Dual-Core MCU"
+        
+        subgraph "Core 0 - Protocol CPU"
+            ST[sensorTask<br/>Priority: 2 High<br/>Stack: 4096 bytes<br/>Frequency: 1Hz<br/>Watchdog: Enabled]
+            
+            ST_COMP1[Sensor Reading Manager]
+            ST_COMP2[Data Processing Pipeline]
+            ST_COMP3[Fusion Engine]
+            ST_COMP4[Alarm State Machine]
+            
+            ST --> ST_COMP1
+            ST --> ST_COMP2
+            ST --> ST_COMP3
+            ST --> ST_COMP4
+        end
+        
+        subgraph "Core 1 - Application CPU"
+            WST[webServerTask<br/>Priority: 1 Normal<br/>Stack: 8192 bytes<br/>Async: Event-driven<br/>Watchdog: Enabled]
+            
+            DT[displayTask<br/>Priority: 1 Normal<br/>Stack: 2048 bytes<br/>Frequency: 2Hz<br/>Non-blocking UI]
+            
+            WST_COMP1[HTTP Request Handler]
+            WST_COMP2[JSON Response Generator]
+            WST_COMP3[WiFi Connection Manager]
+            WST_COMP4[Access Control Validator]
+            
+            DT_COMP1[LCD Controller]
+            DT_COMP2[Alert Renderer]
+            DT_COMP3[Status Display Manager]
+            DT_COMP4[Blink Animation Controller]
+            
+            WST --> WST_COMP1
+            WST --> WST_COMP2
+            WST --> WST_COMP3
+            WST --> WST_COMP4
+            
+            DT --> DT_COMP1
+            DT --> DT_COMP2
+            DT --> DT_COMP3
+            DT --> DT_COMP4
+        end
+        
+        subgraph "Hardware Peripherals"
+            I2C[I2C Bus Pins 21/22<br/>MPU6050 - 0x68<br/>LCD Display - 0x27]
+            
+            OW[OneWire Bus Pin 5<br/>DS18B20 Temperature]
+            
+            ADC[ADC Channels<br/>Rain Sensor - Pin 36<br/>Soil Moisture - Pin 39]
+            
+            GPIO[GPIO Interfaces<br/>Vibration ISR - Pin 34<br/>LED Array - Pins 13,12,14,27<br/>Buzzer PWM - Pin 25<br/>Motor Driver - Pins 18,19,23,26,32,33]
+        end
+        
+        subgraph "Memory Management"
+            SRAM[SRAM Allocation<br/>Data Buffer: 2KB<br/>JSON Buffer: 2KB<br/>Task Stacks: 14KB<br/>Sensor Cache: 1KB<br/>Free Heap: ~280KB]
+            
+            FLASH[Flash Storage<br/>Program Code: ~1.2MB<br/>WiFi Credentials: NVS<br/>HTML Assets: 8KB<br/>Calibration Data: 512B]
+        end
+    end
     
-    node "ESP32 Dual-Core MCU" {
-        
-        node "Core 0 (Protocol CPU)" {
-            component "sensorTask" {
-                [Sensor Reading Manager]
-                [Data Processing Pipeline]
-                [Fusion Engine]
-                [Alarm State Machine]
-                
-                note "Priority: 2 (High)\nStack: 4096 bytes\nFrequency: 1Hz\nWatchdog: Enabled"
-            }
-        }
-        
-        node "Core 1 (Application CPU)" {
-            component "webServerTask" {
-                [HTTP Request Handler]
-                [JSON Response Generator]
-                [WiFi Connection Manager]
-                [Access Control Validator]
-                
-                note "Priority: 1 (Normal)\nStack: 8192 bytes\nAsync: Event-driven\nWatchdog: Enabled"
-            }
-            
-            component "displayTask" {
-                [LCD Controller]
-                [Alert Renderer]
-                [Status Display Manager]
-                [Blink Animation Controller]
-                
-                note "Priority: 1 (Normal)\nStack: 2048 bytes\nFrequency: 2Hz\nNon-blocking UI"
-            }
-        }
-        
-        node "Hardware Peripherals" {
-            component "I2C Bus (Pins 21/22)" {
-                [MPU6050 - 0x68]
-                [LCD Display - 0x27]
-            }
-            
-            component "OneWire Bus (Pin 5)" {
-                [DS18B20 Temperature]
-            }
-            
-            component "ADC Channels" {
-                [Rain Sensor - Pin 36]
-                [Soil Moisture - Pin 39]
-            }
-            
-            component "GPIO Interfaces" {
-                [Vibration ISR - Pin 34]
-                [LED Array - Pins 13,12,14,27]
-                [Buzzer PWM - Pin 25]
-                [Motor Driver - Pins 18,19,23,26,32,33]
-            }
-        }
-        
-        node "Memory Management" {
-            component "SRAM Allocation" {
-                [Data Buffer: 2KB]
-                [JSON Buffer: 2KB]
-                [Task Stacks: 14KB]
-                [Sensor Cache: 1KB]
-                [Free Heap: ~280KB]
-            }
-            
-            component "Flash Storage" {
-                [Program Code: ~1.2MB]
-                [WiFi Credentials: NVS]
-                [HTML Assets: 8KB]
-                [Calibration Data: 512B]
-            }
-        }
-    }
+    subgraph "Network Infrastructure"
+        WAP[WiFi Access Point<br/>Municipal WLAN<br/>Configuration Portal<br/>SSID: TaludESP32-Config<br/>Security: WPA2-PSK<br/>IP Range: 192.168.4.0/24]
+    end
     
-    node "Network Infrastructure" {
-        component "WiFi Access Point" {
-            [Municipal WLAN]
-            [Configuration Portal]
-            
-            note "SSID: TaludESP32-Config\nSecurity: WPA2-PSK\nIP Range: 192.168.4.0/24"
-        }
-    }
-    
-    node "Client Devices" {
-        component "Emergency Dashboard" {
-            [Web Browser Interface]
-            [Real-time Data Display]
-            [Control Panel]
-            [Alert Management]
-            
-            note "Technologies: HTML5, CSS3, JavaScript\nUpdate Rate: 2 seconds\nMobile Responsive: Yes"
-        }
+    subgraph "Client Devices"
+        ED[Emergency Dashboard<br/>Web Browser Interface<br/>Real-time Data Display<br/>Control Panel<br/>Alert Management<br/>Technologies: HTML5, CSS3, JavaScript<br/>Update Rate: 2 seconds<br/>Mobile Responsive: Yes]
         
-        component "Serial Console" {
-            [Debug Interface]
-            [Command Line Control]
-            [System Diagnostics]
-            
-            note "Baud Rate: 115200\nProtocol: ASCII Commands\nBuffer: 256 bytes"
-        }
-    }
+        SC[Serial Console<br/>Debug Interface<br/>Command Line Control<br/>System Diagnostics<br/>Baud Rate: 115200<br/>Protocol: ASCII Commands<br/>Buffer: 256 bytes]
+    end
     
     %% Connections
-    "sensorTask" --> "Hardware Peripherals" : Direct Hardware Access
-    "webServerTask" --> "Network Infrastructure" : HTTP/TCP
-    "displayTask" --> "I2C Bus (Pins 21/22)" : Display Commands
-    "Emergency Dashboard" --> "webServerTask" : REST API Calls
-    "Serial Console" --> "sensorTask" : Command Processing
-    "Data Buffer" --> "Memory Management" : Thread-Safe Storage
+    ST -.-> I2C
+    ST -.-> OW
+    ST -.-> ADC
+    ST -.-> GPIO
+    WST -.-> WAP
+    DT -.-> I2C
+    ED -.-> WST
+    SC -.-> ST
+    ST -.-> SRAM
+    WST -.-> FLASH
 ```
 
 **Componentes principales:**
@@ -960,11 +863,7 @@ Baudios: 115200.
 - computacion en la nube para solucion mas real, ademas implementar protocolos como mqtt para el manejo de la información. 
 
 ---
-## 14. Licencia y Uso Académico
-Proyecto académico para la asignatura de Internet de las Cosas – Universidad de La Sabana. Uso educativo; ajustar antes de despliegues reales en campo.
-
----
-## 15. Referencias (Selección)
+## 14. Referencias (Selección)
 - Bhardwaj (2021) – Análisis de vibraciones y sistemas de alerta temprana.
 - El Moulat et al. (2018) – Arquitecturas IoT para monitoreo ambiental.
 - Henao-Céspedes et al. (2023) – Indicadores multivariables de estabilidad de laderas.
@@ -974,7 +873,7 @@ Proyecto académico para la asignatura de Internet de las Cosas – Universidad 
 (Referencias completas a desarrollar en la Wiki según formato institucional.)
 
 ---
-## 16. Cómo Probar Rápido
+## 15. Cómo Probar Rápido
 1. Cargar `code/challenge2.ino` al ESP32 (Arduino IDE / PlatformIO). 
 2. Abrir monitor serie (115200) y esperar mensaje de portal o IP asignada. 
 3. Si aparece portal: conectarse a red `TaludESP32-Config` (pass: `12345678`), configurar WLAN oficial. 
@@ -983,9 +882,3 @@ Proyecto académico para la asignatura de Internet de las Cosas – Universidad 
 6. Observar cambio de nivel, LED y patrón de buzzer. Reconocer alarma desde dashboard o Serial (`r`).
 
 ---
-## 17. Créditos
-Equipo de desarrollo – Curso IoT 2025-2, Universidad de La Sabana.
-
----
-## 18. Estado Actual
-Versión preliminar alineada con requisitos de Challenge 2. Lista para continuar con documentación Wiki, pruebas formales y refinamiento de calibraciones.
