@@ -62,20 +62,14 @@ const int LED_NARANJA = 14;
 const int LED_ROJO    = 27;
 const int PIN_BUZZER = 25;
 
-// ==================== Motores (Puente H recomendado) ====================
-/* Recomendado TB6612 o L298N. NO conectes motores directo al ESP32.
-   Define pines segun tu driver:
-   TB6612 tipico:
-     AIN1, AIN2, PWMA (ENA) -> Motor A
-     BIN1, BIN2, PWMB (ENB) -> Motor B
-*/
+// ==================== Motores (Puente H) ====================
 const int AIN1 = 33;
 const int AIN2 = 32;
 const int PWMA = 18; // PWM canal A
 
 const int BIN1 = 19;
 const int BIN2 = 23;
-const int PWMB = 26;  // PWM canal B (cambiado de 5 para evitar conflicto con DS18B20)
+const int PWMB = 26;  // PWM canal B 
 
 // ==================== Objetos globales ====================
 LiquidCrystal_I2C lcd(LCD_ADDR1, 16, 2);
@@ -122,7 +116,6 @@ bool soil_ok = false;
 bool lcd_ok_once = false;
 
 // ==================== Estado de sensores ====================
-// Variables de interrupción para vibración
 volatile unsigned long vibPulses = 0;
 volatile unsigned long lastVibMicros = 0;
 unsigned long lastVibCalc = 0;
@@ -137,10 +130,7 @@ bool rainHighPersist = false;
 float lastTempC = NAN;
 unsigned long lastTempMs = 0;
 float tempGradientC_per_min = 0.0f;
-
-// ==================== Umbrales (adaptados a ESP32 y requeridos) ====================
-// Nota: en tu tabla lluvia usa 0-1023 ADC. ESP32 es 0-4095.
-// Escalado x4: 200 -> 800 ; 600 -> 2400.
+// ==================== Umbrales y constantes ====================
 const int RAIN_ADC_NORMAL_MAX   = 800;   // < 200 en 10 bits
 const int RAIN_ADC_PRECAU_MAX   = 2400;  // 200-600 en 10 bits
 const int RAIN_TORRENCIAL_MIN   = 2400;  // >600 en 10 bits
@@ -233,7 +223,6 @@ AdcStats readAdcStats(int pin, int samples, int us_between) {
   return s;
 }
 
-// Heuristica: ADC luce cableado o flotante?
 bool analogLooksWired(const AdcStats& s, int spreadMax, int avgMin, int avgMax) {
   int spread = s.maxv - s.minv;
   if (spread > spreadMax) return false;
@@ -501,7 +490,7 @@ float leerHumedadSueloPct() {
 
 int leerLluviaRaw() {
   if(!rain_ana_ok) return -1;
-  int d = digitalRead(PIN_RAIN_D); // si tienes el modulo, d define seco/mojado
+  int d = digitalRead(PIN_RAIN_D);
   int adc = analogRead(PIN_RAIN_A);
   // Persistencia torrencial: si adc >= torrencial, inicia/continua contador
   unsigned long now = millis();
@@ -512,7 +501,6 @@ int leerLluviaRaw() {
     rainHighStart = 0;
     rainHighPersist = false;
   }
-  // Anti-falsos: si D0 indica NO lluvia (HIGH en muchos modulos) y adc bajo, fuerza a zona baja
   if (d == HIGH && adc < (RAIN_ADC_NORMAL_MAX / 2)) adc = 0;
   return adc;
 }
@@ -549,12 +537,10 @@ float scoreSuelo(float pct) {
 
 float scoreTemperatura(float T, float dTdt) {
   if(isnan(T)) return 0.0f;
-  // base por temperatura absoluta
   float base = 0.0f;
   if(T < TEMP_PRECAU_MIN) base = (T < 5.0f) ? 80.0f : 60.0f; // <5°C fuerte, <10°C moderado
   else if(T > TEMP_NORMAL_MAX) base = 40.0f;
   else base = 0.0f;
-  // gradientes
   if(dTdt > TEMP_GRAD_ALERTA) return clampf(80.0f + (dTdt - TEMP_GRAD_ALERTA) * 5.0f, 80.0f, 100.0f);
   if(dTdt > TEMP_GRAD_PRECAU) base = max(base, 60.0f + (dTdt - TEMP_GRAD_PRECAU) * 5.0f);
   return clampf(base, 0.0f, 100.0f);
@@ -644,14 +630,14 @@ void setupWiFi() {
   
   Serial.println("Iniciando configuración WiFi...");
   
-  // Configuraciones más robustas para WiFiManager
+  // Configuraciones más robusta para WiFiManager
   wm.setDebugOutput(true);
   wm.setConfigPortalBlocking(true); // Cambiar a bloqueante para mayor estabilidad
   wm.setConfigPortalTimeout(300); // 5 minutos timeout
   wm.setConnectTimeout(30); // 30 segundos para conectar
   wm.setAPStaticIPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
   
-  // Reiniciar configuraciones WiFi si es necesario (descomenta la siguiente línea si necesitas reset)
+  // Reinicia configuraciones WiFi si es necesario
   // wm.resetSettings();
   
   Serial.println("Intentando autoconexión...");
